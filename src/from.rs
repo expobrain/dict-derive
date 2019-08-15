@@ -1,22 +1,12 @@
 use quote::{quote, quote_spanned};
-use syn::export::TokenStream2;
+use syn::export::TokenStream;
 use syn::spanned::Spanned;
 
 use syn::{Data, DeriveInput, Field, Ident};
 
-fn is_option(ty: &syn::Type) -> bool {
-    let path = match *ty {
-        syn::Type::Path(ref p) if p.qself.is_none() => &p.path,
-        _ => return false,
-    };
+use crate::utils::{which_field_type, MappedFieldType};
 
-    path.segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .any(|x| x.as_str() == "Option")
-}
-
-fn map_extraction(field: Field) -> TokenStream2 {
+fn map_extraction(field: Field) -> TokenStream {
     let ident = match &field.ident {
         Some(i) => i,
         None => {
@@ -27,10 +17,9 @@ fn map_extraction(field: Field) -> TokenStream2 {
 
     let name = ident.to_string();
 
-    let function = if is_option(&field.ty) {
-        Ident::new("extract_optional", field.ty.span())
-    } else {
-        Ident::new("extract_required", field.ty.span())
+    let function = match which_field_type(&field.ty) {
+        MappedFieldType::IsOption => Ident::new("extract_optional", field.ty.span()),
+        _ => Ident::new("extract_required", field.ty.span()),
     };
 
     quote_spanned! {ident.span()=>
@@ -38,7 +27,7 @@ fn map_extraction(field: Field) -> TokenStream2 {
     }
 }
 
-fn extraction_functions() -> syn::export::TokenStream2 {
+fn extraction_functions() -> syn::export::TokenStream {
     quote! {
         fn map_exception(name: &str, _: PyErr) -> PyErr {
             PyErr::new::<TypeError, _>(format!("Unable to convert key: {}", name))
@@ -64,7 +53,7 @@ fn extraction_functions() -> syn::export::TokenStream2 {
     }
 }
 
-pub fn from_impl(ast: DeriveInput) -> TokenStream2 {
+pub fn from_impl(ast: DeriveInput) -> TokenStream {
     let struct_data = match ast.data {
         Data::Struct(s) => s,
         Data::Enum(e) => {

@@ -3,6 +3,7 @@ extern crate syn;
 
 mod from;
 mod into;
+mod utils;
 
 use from::from_impl;
 use into::into_impl;

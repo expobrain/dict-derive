@@ -25,4 +25,10 @@ pub struct Nested {
     optional_user: Option<OptionalUser>,
 }
 
+#[derive(FromPyObject)]
+pub struct Boxed {
+    users: Box<User>,
+    optional_user: Option<Box<User>>,
+}
+
 fn main() {}

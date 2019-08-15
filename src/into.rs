@@ -4,7 +4,9 @@ use syn::spanned::Spanned;
 
 use syn::{Data, DeriveInput, Field};
 
-fn map_fields(field: Field) -> TokenStream {
+use crate::utils::{which_field_type, MappedFieldType};
+
+fn map_fields(field: &Field) -> TokenStream {
     let ident = match &field.ident {
         Some(i) => i,
         None => {
@@ -16,8 +18,22 @@ fn map_fields(field: Field) -> TokenStream {
     let name = ident.to_string();
 
     // TODO: find a way to do this without the .expect
-    quote_spanned! {field.ty.span()=>
-        dict.set_item(#name, IntoPy::<PyObject>::into_py(self.#ident, py)).expect("Failed to set_item on dict");
+    match which_field_type(&field.ty) {
+        MappedFieldType::IsBox => {
+            quote_spanned! {field.ty.span()=>
+                dict.set_item(#name, IntoPyObject::into_object(*self.#ident, py)).expect("Failed to set_item on dict");
+            }
+        }
+        MappedFieldType::IsOptionBox => {
+            quote_spanned! {field.ty.span()=>
+                dict.set_item(#name, IntoPyObject::into_object(self.#ident.map(|v| *v), py)).expect("Failed to set_item on dict");
+            }
+        }
+        _ => {
+            quote_spanned! {field.ty.span()=>
+                dict.set_item(#name, IntoPyObject::into_object(self.#ident, py)).expect("Failed to set_item on dict");
+            }
+        }
     }
 }
 
